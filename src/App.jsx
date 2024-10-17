@@ -19,7 +19,7 @@ function App() {
     );
     camera.position.set(0, 3, 5);
 
-    renderer = new THREE.WebGLRenderer({antialias: true});
+    renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(
       containerRef.current.clientWidth,
       containerRef.current.clientHeight
@@ -28,6 +28,14 @@ function App() {
     renderer.setPixelRatio(window.devicePixelRatio);
     containerRef.current.appendChild(renderer.domElement);
 
+    const materials = [
+      new THREE.MeshBasicMaterial({ color: 0xff0000 }), // Right face (red)
+      new THREE.MeshBasicMaterial({ color: 0x00ff00 }), // Left face (green)
+      new THREE.MeshBasicMaterial({ color: 0x0000ff }), // Top face (blue)
+      new THREE.MeshBasicMaterial({ color: 0xffff00 }), // Bottom face (yellow)
+      new THREE.MeshBasicMaterial({ color: 0xff00ff }), // Front face (magenta)
+      new THREE.MeshBasicMaterial({ color: 0x00ffff })  // Back face (cyan)
+   ];
     // --- Add Cube and Grid Helper ---
     const geometry = new THREE.BoxGeometry(1, 1, 1);
     const material = new THREE.MeshPhongMaterial({
@@ -35,7 +43,7 @@ function App() {
       transparent: true,
       opacity: 0.7,
     });
-    const cube = new THREE.Mesh(geometry, material);
+    const cube = new THREE.Mesh(geometry, materials);
     scene.add(cube);
 
     // Add Grid and Axis Helpers
@@ -52,14 +60,6 @@ function App() {
     controls = new ArcballControls(camera, renderer.domElement, scene);
     controls.dampingFactor = 10000;
 
-    const materials = [
-      new THREE.MeshBasicMaterial({ color: 0xff0000 }), // Right face (red)
-      new THREE.MeshBasicMaterial({ color: 0x00ff00 }), // Left face (green)
-      new THREE.MeshBasicMaterial({ color: 0x0000ff }), // Top face (blue)
-      new THREE.MeshBasicMaterial({ color: 0xffff00 }), // Bottom face (yellow)
-      new THREE.MeshBasicMaterial({ color: 0xff00ff }), // Front face (magenta)
-      new THREE.MeshBasicMaterial({ color: 0x00ffff })  // Back face (cyan)
-   ];
 
     // --- Gizmo Cube in the Corner ---
     const gizmoCubeGeometry = new THREE.BoxGeometry(1, 1, 1);
@@ -71,7 +71,7 @@ function App() {
     gizmoScene = new THREE.Scene();
     gizmoScene.add(gizmoCube);
 
-    gizmoRenderer = new THREE.WebGLRenderer({antialias: true, alpha: true });
+    gizmoRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     gizmoRenderer.setSize(150, 150); // Keep Gizmo fixed size
     gizmoRenderer.setClearColor(0x000000, 0); // Transparent background
 
@@ -89,6 +89,42 @@ function App() {
     gizmoContainer.style.zIndex = '1000'; // Ensure it's above the main canvas
     gizmoContainer.appendChild(gizmoRenderer.domElement);
     containerRef.current.appendChild(gizmoContainer);
+
+// --- Snap to View Functions ---
+const snapToView = (position) => {
+  camera.position.set(position.x, position.y, position.z);
+  camera.up.set(0, 1, 0); // Reset the camera's up vector to ensure proper orientation
+  camera.lookAt(0, 0, 0); // Always look at the center of the scene (cube remains at the origin)
+  camera.updateProjectionMatrix();
+};
+
+    // Button Event Handlers
+    const frontView = () => snapToView({ x: 0, y: 0, z: 5 });
+    const backView = () => snapToView({ x: 0, y: 0, z: -5 });
+    const topView = () => snapToView({ x: 0, y: 5, z: 0 });
+    const bottomView = () => snapToView({ x: 0, y: -5, z: 0 });
+    const leftView = () => snapToView({ x: -5, y: 0, z: 0 });
+    const rightView = () => snapToView({ x: 5, y: 0, z: 0 });
+
+    // Create Buttons
+    const createButton = (label, onClick) => {
+      const button = document.createElement('button');
+      button.innerText = label;
+      button.style.position = 'absolute';
+      button.style.zIndex = '1001'; // Ensure buttons appear above the canvas
+      button.style.top = `${10 + document.querySelectorAll('button').length * 30}px`; // Stack buttons vertically
+      button.style.right = '10px';
+      button.addEventListener('click', onClick);
+      document.body.appendChild(button);
+    };
+
+    // Create Buttons for Different Views
+    createButton('Front', frontView);
+    createButton('Back', backView);
+    createButton('Top', topView);
+    createButton('Bottom', bottomView);
+    createButton('Left', leftView);
+    createButton('Right', rightView);
 
     // --- Animation Loop ---
     function animate() {
@@ -127,6 +163,7 @@ function App() {
       gizmoRenderer.dispose();
       containerRef.current.removeChild(renderer.domElement);
       containerRef.current.removeChild(gizmoContainer);
+      document.querySelectorAll('button').forEach(button => button.remove()); // Remove buttons on unmount
     };
   }, []);
 
