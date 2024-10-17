@@ -11,13 +11,21 @@ function App() {
   useEffect(() => {
     // --- Main Scene Setup ---
     scene = new THREE.Scene();
-    camera = new THREE.PerspectiveCamera(
-      75,
-      containerRef.current.clientWidth / containerRef.current.clientHeight,
-      0.1,
-      1000
+    
+    const aspect = containerRef.current.clientWidth / containerRef.current.clientHeight;
+    const size = 5; // Control zoom level for orthographic view
+
+    // Create Orthographic Camera
+    camera = new THREE.OrthographicCamera(
+      -size * aspect, // left
+      size * aspect,  // right
+      size,           // top
+      -size,          // bottom
+      0.1,            // near
+      1000            // far
     );
     camera.position.set(0, 3, 5);
+    camera.lookAt(0, 0, 0);
 
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(
@@ -35,14 +43,10 @@ function App() {
       new THREE.MeshBasicMaterial({ color: 0xffff00 }), // Bottom face (yellow)
       new THREE.MeshBasicMaterial({ color: 0xff00ff }), // Front face (magenta)
       new THREE.MeshBasicMaterial({ color: 0x00ffff })  // Back face (cyan)
-   ];
+    ];
+
     // --- Add Cube and Grid Helper ---
     const geometry = new THREE.BoxGeometry(1, 1, 1);
-    const material = new THREE.MeshPhongMaterial({
-      color: 0x00ffff,
-      transparent: true,
-      opacity: 0.7,
-    });
     const cube = new THREE.Mesh(geometry, materials);
     scene.add(cube);
 
@@ -59,13 +63,10 @@ function App() {
     // --- Controls for Main Camera ---
     controls = new ArcballControls(camera, renderer.domElement, scene);
     controls.dampingFactor = 10000;
-
+    controls.target.copy(cube.position); // Ensure the target is the cube's position
 
     // --- Gizmo Cube in the Corner ---
     const gizmoCubeGeometry = new THREE.BoxGeometry(1, 1, 1);
-    const gizmoCubeMaterial = new THREE.MeshBasicMaterial({
-      color: 0xff0000,
-    });
     const gizmoCube = new THREE.Mesh(gizmoCubeGeometry, materials);
 
     gizmoScene = new THREE.Scene();
@@ -90,13 +91,28 @@ function App() {
     gizmoContainer.appendChild(gizmoRenderer.domElement);
     containerRef.current.appendChild(gizmoContainer);
 
-// --- Snap to View Functions ---
-const snapToView = (position) => {
-  camera.position.set(position.x, position.y, position.z);
-  camera.up.set(0, 1, 0); // Reset the camera's up vector to ensure proper orientation
-  camera.lookAt(0, 0, 0); // Always look at the center of the scene (cube remains at the origin)
-  camera.updateProjectionMatrix();
-};
+    // --- Snap to View Functions ---
+    const snapToView = (position) => {
+      camera.position.set(position.x, position.y, position.z);
+      camera.up.set(0, 1, 0); // Reset the camera's up vector
+      controls.target.copy(cube.position); // Make the ArcballControls target the cube's position
+      camera.lookAt(cube.position); // Make the camera look at the cube's position
+      camera.updateProjectionMatrix();
+      controls.update();
+    };
+
+    // --- Realign Function to Center Cube ---
+    const realignCube = () => {
+      // Reset cube's position to ensure it's centered in the arcball
+      // cube.position.set(0, 0, 0); // Reset the cube's position to the origin
+      const currentZoom = camera.zoom;
+      controls.target.set(0, 0, 0); // Reset the arcball target to the cube's new position
+      controls.reset(); // Reset the controls to apply the new target and camera position
+      // camera.lookAt(cube.position); // Ensure the camera is looking at the cube
+      camera.zoom = currentZoom;
+      camera.updateProjectionMatrix();
+      controls.update();
+    };
 
     // Button Event Handlers
     const frontView = () => snapToView({ x: 0, y: 0, z: 5 });
@@ -125,6 +141,7 @@ const snapToView = (position) => {
     createButton('Bottom', bottomView);
     createButton('Left', leftView);
     createButton('Right', rightView);
+    createButton('Realign', realignCube); // Add a Realign button
 
     // --- Animation Loop ---
     function animate() {
@@ -144,10 +161,17 @@ const snapToView = (position) => {
 
     // --- Handle Window Resize ---
     const handleResize = () => {
-      // Resize main scene
-      camera.aspect =
-        containerRef.current.clientWidth / containerRef.current.clientHeight;
+      const aspect = containerRef.current.clientWidth / containerRef.current.clientHeight;
+      const size = 5; // Adjust size for zoom level
+
+      // Resize the orthographic camera
+      camera.left = -size * aspect;
+      camera.right = size * aspect;
+      camera.top = size;
+      camera.bottom = -size;
       camera.updateProjectionMatrix();
+
+      // Resize main renderer
       renderer.setSize(
         containerRef.current.clientWidth,
         containerRef.current.clientHeight
