@@ -26,6 +26,7 @@ function App() {
     );
     camera.position.set(0, 3, 5);
     camera.lookAt(0, 0, 0);
+    camera.up.set(0, 1, 0); // Ensure camera's up vector is aligned with Y-axis
 
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(
@@ -63,6 +64,7 @@ function App() {
     // --- Controls for Main Camera ---
     controls = new ArcballControls(camera, renderer.domElement, scene);
     controls.dampingFactor = 10000;
+    controls.enableGrid = true;
     controls.target.copy(cube.position); // Ensure the target is the cube's position
 
     // --- Gizmo Cube in the Corner ---
@@ -93,23 +95,39 @@ function App() {
 
     // --- Snap to View Functions ---
     const snapToView = (position) => {
-      camera.position.set(position.x, position.y, position.z);
-      camera.up.set(0, 1, 0); // Reset the camera's up vector
-      controls.target.copy(cube.position); // Make the ArcballControls target the cube's position
-      camera.lookAt(cube.position); // Make the camera look at the cube's position
-      camera.updateProjectionMatrix();
-      controls.update();
+      const duration = 0.5; // Adjust duration for smoothness
+      const clock = new THREE.Clock();
+      
+      const startPosition = camera.position.clone();
+      const startUp = camera.up.clone();
+      const endPosition = new THREE.Vector3(position.x, position.y, position.z);
+      const endUp = new THREE.Vector3(0, 1, 0); // Always align 'up' vector to Y-axis
+
+      function animate() {
+        const elapsed = clock.getElapsedTime();
+        const t = Math.min(elapsed / duration, 1); // Interpolate based on time
+        camera.position.lerpVectors(startPosition, endPosition, t);
+        camera.up.lerpVectors(startUp, endUp, t);
+        camera.lookAt(controls.target); // Make the camera look at the cube's position
+        camera.updateProjectionMatrix();
+        controls.update();
+        
+        if (t < 1) {
+          requestAnimationFrame(animate);
+        }
+      }
+      
+      clock.start();
+      animate();
     };
 
     // --- Realign Function to Center Cube ---
     const realignCube = () => {
-      // Reset cube's position to ensure it's centered in the arcball
-      // cube.position.set(0, 0, 0); // Reset the cube's position to the origin
       const currentZoom = camera.zoom;
       controls.target.set(0, 0, 0); // Reset the arcball target to the cube's new position
       controls.reset(); // Reset the controls to apply the new target and camera position
-      // camera.lookAt(cube.position); // Ensure the camera is looking at the cube
       camera.zoom = currentZoom;
+      camera.lookAt(cube.position); // Ensure the camera is looking at the cube
       camera.updateProjectionMatrix();
       controls.update();
     };
