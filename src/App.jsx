@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { ArcballControls } from 'three/addons/controls/ArcballControls.js';
 import './App.css';
+import { DragControls } from 'three/examples/jsm/Addons.js';
 
 function App() {
   const containerRef = useRef(null);
@@ -47,7 +48,7 @@ function App() {
     ];
 
     // --- Add Cube and Grid Helper ---
-    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    const geometry = new THREE.BoxGeometry(2, 2, 2);
     const cube = new THREE.Mesh(geometry, materials);
     scene.add(cube);
 
@@ -64,11 +65,10 @@ function App() {
     // --- Controls for Main Camera ---
     controls = new ArcballControls(camera, renderer.domElement, scene);
     controls.dampingFactor = 10000;
-    controls.enableGrid = true;
     controls.target.copy(cube.position); // Ensure the target is the cube's position
 
     // --- Gizmo Cube in the Corner ---
-    const gizmoCubeGeometry = new THREE.BoxGeometry(1, 1, 1);
+    const gizmoCubeGeometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
     const gizmoCube = new THREE.Mesh(gizmoCubeGeometry, materials);
 
     gizmoScene = new THREE.Scene();
@@ -206,6 +206,7 @@ function App() {
       containerRef.current.removeChild(renderer.domElement);
       containerRef.current.removeChild(gizmoContainer);
       document.querySelectorAll('button').forEach(button => button.remove()); // Remove buttons on unmount
+
     };
   }, []);
 
