@@ -2,12 +2,14 @@ import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { ArcballControls } from 'three/addons/controls/ArcballControls.js';
 import './App.css';
-import { DragControls } from 'three/examples/jsm/Addons.js';
 
 function App() {
   const containerRef = useRef(null);
   let scene, camera, renderer, controls;
   let gizmoScene, gizmoRenderer;
+  let raycaster = new THREE.Raycaster();
+  let mouse = new THREE.Vector2();
+  let intersectedFace = null; // Track the intersected face for highlighting
 
   useEffect(() => {
     // --- Main Scene Setup ---
@@ -30,10 +32,7 @@ function App() {
     camera.up.set(0, 1, 0); // Ensure camera's up vector is aligned with Y-axis
 
     renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(
-      containerRef.current.clientWidth,
-      containerRef.current.clientHeight
-    );
+    renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight);
     renderer.setClearColor(new THREE.Color(0x333333));
     renderer.setPixelRatio(window.devicePixelRatio);
     containerRef.current.appendChild(renderer.domElement);
@@ -69,7 +68,15 @@ function App() {
 
     // --- Gizmo Cube in the Corner ---
     const gizmoCubeGeometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
-    const gizmoCube = new THREE.Mesh(gizmoCubeGeometry, materials);
+    const gizmoMaterials = [
+      new THREE.MeshBasicMaterial({ color: 0xff0000, map: createLabelTexture('Right') }), // Right face
+      new THREE.MeshBasicMaterial({ color: 0x00ff00, map: createLabelTexture('Left') }), // Left face
+      new THREE.MeshBasicMaterial({ color: 0x0000ff, map: createLabelTexture('Top') }), // Top face
+      new THREE.MeshBasicMaterial({ color: 0xffff00, map: createLabelTexture('Bottom') }), // Bottom face
+      new THREE.MeshBasicMaterial({ color: 0xff00ff, map: createLabelTexture('Front') }), // Front face
+      new THREE.MeshBasicMaterial({ color: 0x00ffff, map: createLabelTexture('Back') })   // Back face
+    ];
+    const gizmoCube = new THREE.Mesh(gizmoCubeGeometry, gizmoMaterials);
 
     gizmoScene = new THREE.Scene();
     gizmoScene.add(gizmoCube);
@@ -92,6 +99,69 @@ function App() {
     gizmoContainer.style.zIndex = '1000'; // Ensure it's above the main canvas
     gizmoContainer.appendChild(gizmoRenderer.domElement);
     containerRef.current.appendChild(gizmoContainer);
+
+    // --- Raycasting and Highlighting Logic ---
+    const onMouseMove = (event) => {
+      const rect = gizmoRenderer.domElement.getBoundingClientRect();
+      mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+      raycaster.setFromCamera(mouse, gizmoCamera);
+      const intersects = raycaster.intersectObject(gizmoCube);
+
+      if (intersects.length > 0) {
+        const faceIndex = intersects[0].face.materialIndex;
+
+        if (intersectedFace !== faceIndex) {
+          // Reset previous face color
+          if (intersectedFace !== null) {
+            gizmoCube.material[intersectedFace].color.setHex(gizmoCube.material[intersectedFace].userData.originalColor);
+          }
+          
+          // Highlight new face
+          intersectedFace = faceIndex;
+          const highlightColor = 0xffffff; // White for highlight
+          gizmoCube.material[faceIndex].userData.originalColor = gizmoCube.material[faceIndex].color.getHex(); // Store original color
+          gizmoCube.material[faceIndex].color.setHex(highlightColor);
+        }
+      } else if (intersectedFace !== null) {
+        // Reset previously highlighted face if no intersection
+        gizmoCube.material[intersectedFace].color.setHex(gizmoCube.material[intersectedFace].userData.originalColor);
+        intersectedFace = null;
+      }
+    };
+
+    const onClick = () => {
+      if (intersectedFace !== null) {
+        const faceNames = ['Right', 'Left', 'Top', 'Bottom', 'Front', 'Back'];
+        
+        switch (faceNames[intersectedFace]) {
+          case 'Right':
+            snapToView({ x: 5, y: 0, z: 0 });
+            break;
+          case 'Left':
+            snapToView({ x: -5, y: 0, z: 0 });
+            break;
+          case 'Top':
+            snapToView({ x: 0, y: 5, z: 0 });
+            break;
+          case 'Bottom':
+            snapToView({ x: 0, y: -5, z: 0 });
+            break;
+          case 'Front':
+            snapToView({ x: 0, y: 0, z: 5 });
+            break;
+          case 'Back':
+            snapToView({ x: 0, y: 0, z: -5 });
+            break;
+          default:
+            break;
+        }
+      }
+    };
+
+    gizmoRenderer.domElement.addEventListener('mousemove', onMouseMove);
+    gizmoRenderer.domElement.addEventListener('click', onClick);
 
     // --- Snap to View Functions ---
     const snapToView = (position) => {
@@ -190,10 +260,7 @@ function App() {
       camera.updateProjectionMatrix();
 
       // Resize main renderer
-      renderer.setSize(
-        containerRef.current.clientWidth,
-        containerRef.current.clientHeight
-      );
+      renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight);
     };
     window.addEventListener('resize', handleResize);
 
@@ -206,8 +273,23 @@ function App() {
       containerRef.current.removeChild(renderer.domElement);
       containerRef.current.removeChild(gizmoContainer);
       document.querySelectorAll('button').forEach(button => button.remove()); // Remove buttons on unmount
-
     };
+
+    // Create Label Texture for Gizmo Faces
+    function createLabelTexture(label) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 256;
+      const context = canvas.getContext('2d');
+      context.fillStyle = '#333';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.fillStyle = '#fff';
+      context.font = 'bold 48px Arial';
+      context.textAlign = 'center';
+      context.textBaseline = 'middle';
+      context.fillText(label, canvas.width / 2, canvas.height / 2);
+      return new THREE.CanvasTexture(canvas);
+    }
   }, []);
 
   return (
