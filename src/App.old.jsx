@@ -67,29 +67,20 @@ function App() {
     controls.dampingFactor = 10000;
     controls.target.copy(cube.position); // Ensure the target is the cube's position
 
-    // --- Gizmo Group in the Corner ---
-    const gizmoCube = new THREE.Group(); // Use a group to hold multiple objects
-
-    // Create the cube and add to the group
+    // --- Gizmo Cube in the Corner ---
     const gizmoCubeGeometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
     const gizmoMaterials = [
       new THREE.MeshBasicMaterial({ color: 0xff0000, map: createLabelTexture('Right') }), // Right face
       new THREE.MeshBasicMaterial({ color: 0x00ff00, map: createLabelTexture('Left') }), // Left face
-      new THREE.MeshBasicMaterial({ color: 0x0000ff, map: createLabelTexture('Top') }),  // Top face
-      new THREE.MeshBasicMaterial({ color: 0xffff00, map: createLabelTexture('Bottom') }),// Bottom face
-      new THREE.MeshBasicMaterial({ color: 0xff00ff, map: createLabelTexture('Front') }),// Front face
-      new THREE.MeshBasicMaterial({ color: 0x00ffff, map: createLabelTexture('Back') })  // Back face
+      new THREE.MeshBasicMaterial({ color: 0x0000ff, map: createLabelTexture('Top') }), // Top face
+      new THREE.MeshBasicMaterial({ color: 0xffff00, map: createLabelTexture('Bottom') }), // Bottom face
+      new THREE.MeshBasicMaterial({ color: 0xff00ff, map: createLabelTexture('Front') }), // Front face
+      new THREE.MeshBasicMaterial({ color: 0x00ffff, map: createLabelTexture('Back') })   // Back face
     ];
-    const cubeMesh = new THREE.Mesh(gizmoCubeGeometry, gizmoMaterials);
-    gizmoCube.add(cubeMesh); // Add the cube mesh to the group
+    const gizmoCube = new THREE.Mesh(gizmoCubeGeometry, gizmoMaterials);
 
-    // Add Axes Helper to the gizmoCube group
-    const thickAxes = createThickAxes(1.2, 0.1); // Adjust size and thickness as needed
-    gizmoCube.add(thickAxes); // Add thick axes to gizmo group
-
-    // Create Gizmo Scene
     gizmoScene = new THREE.Scene();
-    gizmoScene.add(gizmoCube); // Add group to the gizmo scene
+    gizmoScene.add(gizmoCube);
 
     gizmoRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     gizmoRenderer.setSize(150, 150); // Keep Gizmo fixed size
@@ -117,9 +108,7 @@ function App() {
       mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
       raycaster.setFromCamera(mouse, gizmoCamera);
-
-      // Raycast for gizmo group children
-      const intersects = raycaster.intersectObjects(gizmoCube.children);
+      const intersects = raycaster.intersectObject(gizmoCube);
 
       if (intersects.length > 0) {
         const faceIndex = intersects[0].face.materialIndex;
@@ -127,18 +116,18 @@ function App() {
         if (intersectedFace !== faceIndex) {
           // Reset previous face color
           if (intersectedFace !== null) {
-            gizmoCube.children[0].material[intersectedFace].color.setHex(gizmoCube.children[0].material[intersectedFace].userData.originalColor);
+            gizmoCube.material[intersectedFace].color.setHex(gizmoCube.material[intersectedFace].userData.originalColor);
           }
           
           // Highlight new face
           intersectedFace = faceIndex;
           const highlightColor = 0xffffff; // White for highlight
-          gizmoCube.children[0].material[faceIndex].userData.originalColor = gizmoCube.children[0].material[faceIndex].color.getHex(); // Store original color
-          gizmoCube.children[0].material[faceIndex].color.setHex(highlightColor);
+          gizmoCube.material[faceIndex].userData.originalColor = gizmoCube.material[faceIndex].color.getHex(); // Store original color
+          gizmoCube.material[faceIndex].color.setHex(highlightColor);
         }
       } else if (intersectedFace !== null) {
         // Reset previously highlighted face if no intersection
-        gizmoCube.children[0].material[intersectedFace].color.setHex(gizmoCube.children[0].material[intersectedFace].userData.originalColor);
+        gizmoCube.material[intersectedFace].color.setHex(gizmoCube.material[intersectedFace].userData.originalColor);
         intersectedFace = null;
       }
     };
@@ -321,81 +310,6 @@ function App() {
       return new THREE.CanvasTexture(canvas);
     }
   }, []);
-
-  function createThickAxes(size = 5, thickness = 0.05, labels = { x: "X", y: "Y", z: "Z" }) {
-    const axesGroup = new THREE.Group();
-  
-    // Define colors for X, Y, Z axes
-    const axisColors = {
-      x: 0xff0000, // Red
-      y: 0x00ff00, // Green
-      z: 0x0000ff  // Blue
-    };
-  
-    // Create cylinders for each axis
-    const axisGeometry = new THREE.CylinderGeometry(thickness, thickness, size, 32);
-  
-    // X Axis (Red)
-    const xAxisMaterial = new THREE.MeshBasicMaterial({ color: axisColors.x });
-    const xAxis = new THREE.Mesh(axisGeometry, xAxisMaterial);
-    xAxis.rotation.z = Math.PI / 2; // Rotate the cylinder to lie on the X-axis
-    xAxis.position.x = size / 2; // Position it along the X-axis
-    axesGroup.add(xAxis);
-  
-    // Y Axis (Green)
-    const yAxisMaterial = new THREE.MeshBasicMaterial({ color: axisColors.y });
-    const yAxis = new THREE.Mesh(axisGeometry, yAxisMaterial);
-    yAxis.position.y = size / 2; // Position it along the Y-axis
-    axesGroup.add(yAxis);
-  
-    // Z Axis (Blue)
-    const zAxisMaterial = new THREE.MeshBasicMaterial({ color: axisColors.z });
-    const zAxis = new THREE.Mesh(axisGeometry, zAxisMaterial);
-    zAxis.rotation.x = Math.PI / 2; // Rotate the cylinder to lie on the Z-axis
-    zAxis.position.z = size / 2; // Position it along the Z-axis
-    axesGroup.add(zAxis);
-  
-    // Function to create a label as a Sprite
-    const createLabel = (text) => {
-      const canvas = document.createElement('canvas');
-      const size = 128; // Size of the canvas
-      canvas.width = size;
-      canvas.height = size;
-      const context = canvas.getContext('2d');
-      context.fillStyle = 'rgba(255, 255, 255, 1.0)';
-      context.font = '48px Arial';
-      context.textAlign = 'center';
-      context.textBaseline = 'middle';
-      context.fillText(text, size / 2, size / 2);
-      
-      const texture = new THREE.CanvasTexture(canvas);
-      const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
-      const sprite = new THREE.Sprite(spriteMaterial);
-      sprite.scale.set(0.5, 0.5, 1); // Adjust label size
-      return sprite;
-    };
-  
-    // Add labels to the ends of the axes if provided
-    if (labels.x) {
-      const xLabel = createLabel(labels.x);
-      xLabel.position.set(size + 0.5, 0, 0); // Position it slightly beyond the end of the X-axis
-      axesGroup.add(xLabel);
-    }
-  
-    if (labels.y) {
-      const yLabel = createLabel(labels.y);
-      yLabel.position.set(0, size + 0.5, 0); // Position it slightly beyond the end of the Y-axis
-      axesGroup.add(yLabel);
-    }
-  
-    if (labels.z) {
-      const zLabel = createLabel(labels.z);
-      zLabel.position.set(0, 0, size + 0.5); // Position it slightly beyond the end of the Z-axis
-      axesGroup.add(zLabel);
-    }
-  
-    return axesGroup;
-  }
 
   return (
     <div ref={containerRef} style={{ width: '100%', height: '100%' }}></div>
